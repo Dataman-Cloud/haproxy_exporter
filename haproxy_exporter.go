@@ -92,32 +92,39 @@ func (m metrics) String() string {
 }
 
 var (
-	serverMetrics = metrics{
-		2:  newServerMetric("current_queue", "Current number of queued requests assigned to this server.", nil),
-		3:  newServerMetric("max_queue", "Maximum observed number of queued requests assigned to this server.", nil),
-		4:  newServerMetric("current_sessions", "Current number of active sessions.", nil),
-		5:  newServerMetric("max_sessions", "Maximum observed number of active sessions.", nil),
-		6:  newServerMetric("limit_sessions", "Configured session limit.", nil),
-		7:  newServerMetric("connections_total", "Total number of connections.", nil),
-		8:  newServerMetric("bytes_in_total", "Current total of incoming bytes.", nil),
-		9:  newServerMetric("bytes_out_total", "Current total of outgoing bytes.", nil),
-		13: newServerMetric("connection_errors_total", "Total of connection errors.", nil),
-		14: newServerMetric("response_errors_total", "Total of response errors.", nil),
-		15: newServerMetric("retry_warnings_total", "Total of retry warnings.", nil),
-		16: newServerMetric("redispatch_warnings_total", "Total of redispatch warnings.", nil),
-		17: newServerMetric("up", "Current health status of the server (1 = UP, 0 = DOWN).", nil),
-		18: newServerMetric("weight", "Current weight of the server.", nil),
-		21: newServerMetric("check_failures_total", "Total number of failed health checks.", nil),
-		24: newServerMetric("downtime_seconds_total", "Total downtime in seconds.", nil),
-		33: newServerMetric("current_session_rate", "Current number of sessions per second over last elapsed second.", nil),
-		35: newServerMetric("max_session_rate", "Maximum observed number of sessions per second.", nil),
-		38: newServerMetric("check_duration_milliseconds", "Previously run health check duration, in milliseconds", nil),
-		39: newServerMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "1xx"}),
-		40: newServerMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "2xx"}),
-		41: newServerMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "3xx"}),
-		42: newServerMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "4xx"}),
-		43: newServerMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "5xx"}),
-		44: newServerMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "other"}),
+	dmAppDefaultLabels      = prometheus.Labels{"app": "", "cluster": "", "task": ""}
+	dmAppDefaultLabels1xx   = prometheus.Labels{"code": "1xx", "app": "", "cluster": "", "task": ""}
+	dmAppDefaultLabels2xx   = prometheus.Labels{"code": "2xx", "app": "", "cluster": "", "task": ""}
+	dmAppDefaultLabels3xx   = prometheus.Labels{"code": "3xx", "app": "", "cluster": "", "task": ""}
+	dmAppDefaultLabels4xx   = prometheus.Labels{"code": "4xx", "app": "", "cluster": "", "task": ""}
+	dmAppDefaultLabels5xx   = prometheus.Labels{"code": "5xx", "app": "", "cluster": "", "task": ""}
+	dmAppDefaultLabelsOther = prometheus.Labels{"code": "other", "app": "", "cluster": "", "task": ""}
+	serverMetrics           = metrics{
+		2:  newServerMetric("current_queue", "Current number of queued requests assigned to this server.", dmAppDefaultLabels),
+		3:  newServerMetric("max_queue", "Maximum observed number of queued requests assigned to this server.", dmAppDefaultLabels),
+		4:  newServerMetric("current_sessions", "Current number of active sessions.", dmAppDefaultLabels),
+		5:  newServerMetric("max_sessions", "Maximum observed number of active sessions.", dmAppDefaultLabels),
+		6:  newServerMetric("limit_sessions", "Configured session limit.", dmAppDefaultLabels),
+		7:  newServerMetric("connections_total", "Total number of connections.", dmAppDefaultLabels),
+		8:  newServerMetric("bytes_in_total", "Current total of incoming bytes.", dmAppDefaultLabels),
+		9:  newServerMetric("bytes_out_total", "Current total of outgoing bytes.", dmAppDefaultLabels),
+		13: newServerMetric("connection_errors_total", "Total of connection errors.", dmAppDefaultLabels),
+		14: newServerMetric("response_errors_total", "Total of response errors.", dmAppDefaultLabels),
+		15: newServerMetric("retry_warnings_total", "Total of retry warnings.", dmAppDefaultLabels),
+		16: newServerMetric("redispatch_warnings_total", "Total of redispatch warnings.", dmAppDefaultLabels),
+		17: newServerMetric("up", "Current health status of the server (1 = UP, 0 = DOWN).", dmAppDefaultLabels),
+		18: newServerMetric("weight", "Current weight of the server.", dmAppDefaultLabels),
+		21: newServerMetric("check_failures_total", "Total number of failed health checks.", dmAppDefaultLabels),
+		24: newServerMetric("downtime_seconds_total", "Total downtime in seconds.", dmAppDefaultLabels),
+		33: newServerMetric("current_session_rate", "Current number of sessions per second over last elapsed second.", dmAppDefaultLabels),
+		35: newServerMetric("max_session_rate", "Maximum observed number of sessions per second.", dmAppDefaultLabels),
+		38: newServerMetric("check_duration_milliseconds", "Previously run health check duration, in milliseconds", dmAppDefaultLabels),
+		39: newServerMetric("http_responses_total", "Total of HTTP responses.", dmAppDefaultLabels1xx),
+		40: newServerMetric("http_responses_total", "Total of HTTP responses.", dmAppDefaultLabels2xx),
+		41: newServerMetric("http_responses_total", "Total of HTTP responses.", dmAppDefaultLabels3xx),
+		42: newServerMetric("http_responses_total", "Total of HTTP responses.", dmAppDefaultLabels4xx),
+		43: newServerMetric("http_responses_total", "Total of HTTP responses.", dmAppDefaultLabels5xx),
+		44: newServerMetric("http_responses_total", "Total of HTTP responses.", dmAppDefaultLabelsOther),
 	}
 )
 
@@ -150,6 +157,18 @@ func NewExporter(uri string, selectedServerMetrics map[int]*prometheus.GaugeVec,
 		return nil, fmt.Errorf("unsupported scheme: %q", u.Scheme)
 	}
 
+	app := strings.Replace(os.Getenv("MARATHON_APP_ID"), "/", "", -1)
+	cluster := os.Getenv("MARATHON_APP_LABEL_VCLUSTER")
+	task := os.Getenv("MESOS_TASK_ID")
+
+	dmAppLabels := prometheus.Labels{"app": app, "cluster": cluster, "task": task}
+	dmAppLabels1xx := prometheus.Labels{"code": "1xx", "app": app, "cluster": cluster, "task": task}
+	dmAppLabels2xx := prometheus.Labels{"code": "2xx", "app": app, "cluster": cluster, "task": task}
+	dmAppLabels3xx := prometheus.Labels{"code": "3xx", "app": app, "cluster": cluster, "task": task}
+	dmAppLabels4xx := prometheus.Labels{"code": "4xx", "app": app, "cluster": cluster, "task": task}
+	dmAppLabels5xx := prometheus.Labels{"code": "5xx", "app": app, "cluster": cluster, "task": task}
+	dmAppLabelsOther := prometheus.Labels{"code": "other", "app": app, "cluster": cluster, "task": task}
+
 	return &Exporter{
 		URI:   uri,
 		fetch: fetch,
@@ -169,48 +188,48 @@ func NewExporter(uri string, selectedServerMetrics map[int]*prometheus.GaugeVec,
 			Help:      "Number of errors while parsing CSV.",
 		}),
 		frontendMetrics: map[int]*prometheus.GaugeVec{
-			4:  newFrontendMetric("current_sessions", "Current number of active sessions.", nil),
-			5:  newFrontendMetric("max_sessions", "Maximum observed number of active sessions.", nil),
-			6:  newFrontendMetric("limit_sessions", "Configured session limit.", nil),
-			7:  newFrontendMetric("connections_total", "Total number of connections.", nil),
-			8:  newFrontendMetric("bytes_in_total", "Current total of incoming bytes.", nil),
-			9:  newFrontendMetric("bytes_out_total", "Current total of outgoing bytes.", nil),
-			10: newFrontendMetric("requests_denied_total", "Total of requests denied for security.", nil),
-			12: newFrontendMetric("request_errors_total", "Total of request errors.", nil),
-			33: newFrontendMetric("current_session_rate", "Current number of sessions per second over last elapsed second.", nil),
-			34: newFrontendMetric("limit_session_rate", "Configured limit on new sessions per second.", nil),
-			35: newFrontendMetric("max_session_rate", "Maximum observed number of sessions per second.", nil),
-			39: newFrontendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "1xx"}),
-			40: newFrontendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "2xx"}),
-			41: newFrontendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "3xx"}),
-			42: newFrontendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "4xx"}),
-			43: newFrontendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "5xx"}),
-			44: newFrontendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "other"}),
-			48: newFrontendMetric("http_requests_total", "Total HTTP requests.", nil),
+			4:  newFrontendMetric("current_sessions", "Current number of active sessions.", dmAppLabels),
+			5:  newFrontendMetric("max_sessions", "Maximum observed number of active sessions.", dmAppLabels),
+			6:  newFrontendMetric("limit_sessions", "Configured session limit.", dmAppLabels),
+			7:  newFrontendMetric("connections_total", "Total number of connections.", dmAppLabels),
+			8:  newFrontendMetric("bytes_in_total", "Current total of incoming bytes.", dmAppLabels),
+			9:  newFrontendMetric("bytes_out_total", "Current total of outgoing bytes.", dmAppLabels),
+			10: newFrontendMetric("requests_denied_total", "Total of requests denied for security.", dmAppLabels),
+			12: newFrontendMetric("request_errors_total", "Total of request errors.", dmAppLabels),
+			33: newFrontendMetric("current_session_rate", "Current number of sessions per second over last elapsed second.", dmAppLabels),
+			34: newFrontendMetric("limit_session_rate", "Configured limit on new sessions per second.", dmAppLabels),
+			35: newFrontendMetric("max_session_rate", "Maximum observed number of sessions per second.", dmAppLabels),
+			39: newFrontendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels1xx),
+			40: newFrontendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels2xx),
+			41: newFrontendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels3xx),
+			42: newFrontendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels4xx),
+			43: newFrontendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels5xx),
+			44: newFrontendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabelsOther),
+			48: newFrontendMetric("http_requests_total", "Total HTTP requests.", dmAppLabels),
 		},
 		backendMetrics: map[int]*prometheus.GaugeVec{
-			2:  newBackendMetric("current_queue", "Current number of queued requests not assigned to any server.", nil),
-			3:  newBackendMetric("max_queue", "Maximum observed number of queued requests not assigned to any server.", nil),
-			4:  newBackendMetric("current_sessions", "Current number of active sessions.", nil),
-			5:  newBackendMetric("max_sessions", "Maximum observed number of active sessions.", nil),
-			6:  newBackendMetric("limit_sessions", "Configured session limit.", nil),
-			7:  newBackendMetric("connections_total", "Total number of connections.", nil),
-			8:  newBackendMetric("bytes_in_total", "Current total of incoming bytes.", nil),
-			9:  newBackendMetric("bytes_out_total", "Current total of outgoing bytes.", nil),
-			13: newBackendMetric("connection_errors_total", "Total of connection errors.", nil),
-			14: newBackendMetric("response_errors_total", "Total of response errors.", nil),
-			15: newBackendMetric("retry_warnings_total", "Total of retry warnings.", nil),
-			16: newBackendMetric("redispatch_warnings_total", "Total of redispatch warnings.", nil),
-			17: newBackendMetric("up", "Current health status of the backend (1 = UP, 0 = DOWN).", nil),
-			18: newBackendMetric("weight", "Total weight of the servers in the backend.", nil),
-			33: newBackendMetric("current_session_rate", "Current number of sessions per second over last elapsed second.", nil),
-			35: newBackendMetric("max_session_rate", "Maximum number of sessions per second.", nil),
-			39: newBackendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "1xx"}),
-			40: newBackendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "2xx"}),
-			41: newBackendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "3xx"}),
-			42: newBackendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "4xx"}),
-			43: newBackendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "5xx"}),
-			44: newBackendMetric("http_responses_total", "Total of HTTP responses.", prometheus.Labels{"code": "other"}),
+			2:  newBackendMetric("current_queue", "Current number of queued requests not assigned to any server.", dmAppLabels),
+			3:  newBackendMetric("max_queue", "Maximum observed number of queued requests not assigned to any server.", dmAppLabels),
+			4:  newBackendMetric("current_sessions", "Current number of active sessions.", dmAppLabels),
+			5:  newBackendMetric("max_sessions", "Maximum observed number of active sessions.", dmAppLabels),
+			6:  newBackendMetric("limit_sessions", "Configured session limit.", dmAppLabels),
+			7:  newBackendMetric("connections_total", "Total number of connections.", dmAppLabels),
+			8:  newBackendMetric("bytes_in_total", "Current total of incoming bytes.", dmAppLabels),
+			9:  newBackendMetric("bytes_out_total", "Current total of outgoing bytes.", dmAppLabels),
+			13: newBackendMetric("connection_errors_total", "Total of connection errors.", dmAppLabels),
+			14: newBackendMetric("response_errors_total", "Total of response errors.", dmAppLabels),
+			15: newBackendMetric("retry_warnings_total", "Total of retry warnings.", dmAppLabels),
+			16: newBackendMetric("redispatch_warnings_total", "Total of redispatch warnings.", dmAppLabels),
+			17: newBackendMetric("up", "Current health status of the backend (1 = UP, 0 = DOWN).", dmAppLabels),
+			18: newBackendMetric("weight", "Total weight of the servers in the backend.", dmAppLabels),
+			33: newBackendMetric("current_session_rate", "Current number of sessions per second over last elapsed second.", dmAppLabels),
+			35: newBackendMetric("max_session_rate", "Maximum number of sessions per second.", dmAppLabels),
+			39: newBackendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels1xx),
+			40: newBackendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels2xx),
+			41: newBackendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels3xx),
+			42: newBackendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels4xx),
+			43: newBackendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabels5xx),
+			44: newBackendMetric("http_responses_total", "Total of HTTP responses.", dmAppLabelsOther),
 		},
 		serverMetrics: selectedServerMetrics,
 	}, nil
